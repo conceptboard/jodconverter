@@ -163,6 +163,16 @@ class OfficeProcess {
 		if (process == null) {
 			return false;
 		}
+		try {
+			long foundPid = this.processManager.findPid(new ProcessQuery(OfficeUtils.getOfficeExecutable(officeHome).getName(), this.unoUrl.getAcceptString()));
+			if(foundPid == PID_NOT_FOUND) {
+				return false;
+			}
+		} catch(IOException e) {
+			logger.fine("Could not even request pid to find");
+			//fail back to exit code
+		}
+
 		return getExitCode() == null;
 	}
 

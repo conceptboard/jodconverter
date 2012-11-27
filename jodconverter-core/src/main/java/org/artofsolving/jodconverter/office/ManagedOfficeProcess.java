@@ -87,23 +87,29 @@ class ManagedOfficeProcess {
 	}
 
 	public void restartDueToTaskTimeout() {
-		executor.execute(new Runnable() {
+		Future<?> future = executor.submit(new Runnable() {
 			public void run() {
 				try {
 					doTerminateProcess();
+					doStartProcessAndConnect();
 				} catch (OfficeException e) {
 					logger.info("error on restart due to task timeout; making sure process is gone and restarted");
 					doEnsureProcessExited();
-					restartDueToLostConnection();
+					doStartProcessAndConnect();
 					throw e;
 				}
 				// will cause unexpected disconnection and subsequent restart
 			}
 		});
+		try {
+			future.get();
+		} catch (Exception exception) {
+			throw new OfficeException("failed to restart due to timeout", exception);
+		}
 	}
 
 	public void restartDueToLostConnection() {
-		executor.execute(new Runnable() {
+		Future<?> future = executor.submit(new Runnable() {
 			public void run() {
 				try {
 					doEnsureProcessExited();
@@ -113,6 +119,11 @@ class ManagedOfficeProcess {
 				}
 			}
 		});
+		try {
+			future.get();
+		} catch (Exception exception) {
+			throw new OfficeException("failed to restart due to timeout", exception);
+		}
 	}
 
 	private void doStartProcessAndConnect() throws OfficeException {
@@ -180,4 +191,7 @@ class ManagedOfficeProcess {
 		return connection.isConnected();
 	}
 
+	public boolean isRunning() {
+		return process.isRunning();
+	}
 }
