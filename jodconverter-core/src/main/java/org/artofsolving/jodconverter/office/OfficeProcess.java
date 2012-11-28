@@ -21,7 +21,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.commons.io.FileUtils;
 import org.artofsolving.jodconverter.process.ProcessManager;
@@ -41,8 +42,8 @@ class OfficeProcess {
 	private Process process;
 	private long pid = PID_UNKNOWN;
 
-	private final Logger logger = Logger.getLogger(getClass().getName());
-	private final Logger loggerProcessOutput = Logger.getLogger(logger.getName() + ".ProcessOutput");
+	private final Logger logger = LoggerFactory.getLogger(OfficeProcess.class);
+	private final Logger loggerProcessOutput = LoggerFactory.getLogger(logger.getName() + ".ProcessOutput");
 	
 	public OfficeProcess(File officeHome, UnoUrl unoUrl, String[] runAsArgs, File templateProfileDir, File workDir, ProcessManager processManager) {
 		this.officeHome = officeHome;
@@ -86,13 +87,12 @@ class OfficeProcess {
         if (PlatformUtils.isWindows()) {
 			addBasisAndUrePaths(processBuilder);
 		}
-		logger.info(String.format("starting process with acceptString '%s' and profileDir '%s'", unoUrl, instanceProfileDir));
+		logger.info(String.format("starting process with acceptString '{}' and profileDir '{}'", unoUrl, instanceProfileDir));
 		process = processBuilder.start();
 		pid = processManager.findPid(processQuery);
 		ProcessLoggingUtils.logProcessOutput(process, pid, loggerProcessOutput);
 		if (pid == PID_NOT_FOUND) {
-            throw new IllegalStateException(String.format("process with acceptString '%s' started but its pid could not be found",
-                    unoUrl.getAcceptString()));
+            throw new IllegalStateException("process with acceptString '" + unoUrl.getAcceptString() + "' started but its pid could not be found");
 		}
 		logger.info("started process" + (pid != PID_UNKNOWN ? "; pid = " + pid : ""));
 	}
@@ -104,7 +104,7 @@ class OfficeProcess {
 
 	private void prepareInstanceProfileDir() throws OfficeException {
 		if (instanceProfileDir.exists()) {
-			logger.warning(String.format("profile dir '%s' already exists; deleting", instanceProfileDir));
+			logger.warn("profile dir '{}' already exists; deleting", instanceProfileDir);
 			deleteProfileDir();
 		}
 		if (templateProfileDir != null) {
@@ -123,9 +123,9 @@ class OfficeProcess {
             } catch (IOException ioException) {
                 File oldProfileDir = new File(instanceProfileDir.getParentFile(), instanceProfileDir.getName() + ".old." + System.currentTimeMillis());
 				if (instanceProfileDir.renameTo(oldProfileDir)) {
-					logger.warning("could not delete profileDir: " + ioException.getMessage() + "; renamed it to " + oldProfileDir);
+					logger.warn("could not delete profileDir: " + ioException.getMessage() + "; renamed it to " + oldProfileDir);
 				} else {
-					logger.severe("could not delete profileDir: " + ioException.getMessage());
+					logger.warn("could not delete profileDir: " + ioException.getMessage());
 				}
 			}
 		}
@@ -135,7 +135,7 @@ class OfficeProcess {
 		// see http://wiki.services.openoffice.org/wiki/ODF_Toolkit/Efforts/Three-Layer_OOo
         File basisLink = new File(officeHome, "basis-link");
 		if (!basisLink.isFile()) {
-			logger.fine("no %OFFICE_HOME%/basis-link found; assuming it's OOo 2.x and we don't need to append URE and Basic paths");
+			logger.debug("no %OFFICE_HOME%/basis-link found; assuming it's OOo 2.x and we don't need to append URE and Basic paths");
 			return;
 		}
         String basisLinkText = FileUtils.readFileToString(basisLink).trim();
@@ -155,7 +155,7 @@ class OfficeProcess {
 			}
 		}
         String path = environment.get(pathKey) + ";" + ureBin.getAbsolutePath() + ";" + basisProgram.getAbsolutePath();
-		logger.fine(String.format("setting %s to \"%s\"", pathKey, path));
+		logger.debug(String.format("setting %s to \"%s\"", pathKey, path));
 		environment.put(pathKey, path);
 	}
 
@@ -163,6 +163,16 @@ class OfficeProcess {
 		if (process == null) {
 			return false;
 		}
+		try {
+			long foundPid = this.processManager.findPid(new ProcessQuery(OfficeUtils.getOfficeExecutable(officeHome).getName(), this.unoUrl.getAcceptString()));
+			if(foundPid == PID_NOT_FOUND) {
+				return false;
+			}
+		} catch(IOException e) {
+			logger.warn("Could not even request pid to find");
+			//fail back to exit code
+		}
+
 		return getExitCode() == null;
 	}
 

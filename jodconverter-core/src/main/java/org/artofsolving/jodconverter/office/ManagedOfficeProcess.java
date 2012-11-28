@@ -16,8 +16,8 @@ import java.net.ConnectException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.sun.star.frame.XDesktop;
 import com.sun.star.lang.DisposedException;
@@ -33,7 +33,7 @@ class ManagedOfficeProcess {
 
 	private ExecutorService executor = Executors.newSingleThreadExecutor(new NamedThreadFactory("OfficeProcessThread"));
 
-	private final Logger logger = Logger.getLogger(getClass().getName());
+	private final Logger logger = LoggerFactory.getLogger(ManagedOfficeProcess.class);
 
 	public ManagedOfficeProcess(ManagedOfficeProcessSettings settings) throws OfficeException {
 		this.settings = settings;
@@ -87,32 +87,43 @@ class ManagedOfficeProcess {
 	}
 
 	public void restartDueToTaskTimeout() {
-		executor.execute(new Runnable() {
+		Future<?> future = executor.submit(new Runnable() {
 			public void run() {
 				try {
 					doTerminateProcess();
+					doStartProcessAndConnect();
 				} catch (OfficeException e) {
 					logger.info("error on restart due to task timeout; making sure process is gone and restarted");
 					doEnsureProcessExited();
-					restartDueToLostConnection();
+					doStartProcessAndConnect();
 					throw e;
 				}
 				// will cause unexpected disconnection and subsequent restart
 			}
 		});
+		try {
+			future.get();
+		} catch (Exception exception) {
+			throw new OfficeException("failed to restart due to timeout", exception);
+		}
 	}
 
 	public void restartDueToLostConnection() {
-		executor.execute(new Runnable() {
+		Future<?> future = executor.submit(new Runnable() {
 			public void run() {
 				try {
 					doEnsureProcessExited();
 					doStartProcessAndConnect();
 				} catch (OfficeException officeException) {
-					logger.log(Level.SEVERE, "could not restart process", officeException);
+					logger.error("could not restart process", officeException);
 				}
 			}
 		});
+		try {
+			future.get();
+		} catch (Exception exception) {
+			throw new OfficeException("failed to restart due to timeout", exception);
+		}
 	}
 
 	private void doStartProcessAndConnect() throws OfficeException {
@@ -130,7 +141,7 @@ class ManagedOfficeProcess {
 						} else if (exitCode.equals(EXIT_CODE_NEW_INSTALLATION)) {
 							// restart and retry later
 							// see http://code.google.com/p/jodconverter/issues/detail?id=84
-							logger.log(Level.WARNING, "office process died with exit code 81; restarting it");
+							logger.warn("office process died with exit code 81; restarting it");
 							process.start(true);
 							throw new TemporaryException(connectException);
 						} else {
@@ -180,4 +191,7 @@ class ManagedOfficeProcess {
 		return connection.isConnected();
 	}
 
+	public boolean isRunning() {
+		return process.isRunning();
+	}
 }

@@ -14,6 +14,10 @@ package org.artofsolving.jodconverter.office;
 
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.lang.Thread.UncaughtExceptionHandler;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link ThreadFactory} that allows for custom thread names
@@ -21,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 class NamedThreadFactory implements ThreadFactory {
 
     private static final AtomicInteger threadIndex = new AtomicInteger(0);
+	private static final Logger logger = LoggerFactory.getLogger(NamedThreadFactory.class);
 
     private final String baseName;
     private final boolean daemon;
@@ -37,6 +42,12 @@ class NamedThreadFactory implements ThreadFactory {
     public Thread newThread(Runnable runnable) {
         Thread thread = new Thread(runnable, baseName + "-" + threadIndex.getAndIncrement());
         thread.setDaemon(daemon);
+		thread.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+			@Override
+			public void uncaughtException(Thread t, Throwable e) {
+				logger.error("Failure in thread", e);
+			}
+		});
         return thread;
     }
 

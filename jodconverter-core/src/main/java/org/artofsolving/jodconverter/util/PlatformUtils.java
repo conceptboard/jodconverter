@@ -17,12 +17,12 @@ package org.artofsolving.jodconverter.util;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class PlatformUtils {
 
-    private static final Logger logger = Logger.getLogger(PlatformUtils.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(PlatformUtils.class);
 
     private static final String OS_NAME = System.getProperty("os.name").toLowerCase();
 
@@ -145,7 +145,7 @@ public class PlatformUtils {
     protected static String searchExistingfile(List<String> pathList) {
         for (String path : pathList) {
             if (new File(path).exists()) {
-                logger.log(Level.INFO, "Jod will be using " + path);
+                logger.info("Jod will be using ", path);
                 return path;
             }
         }

@@ -17,7 +17,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class PooledOfficeManager implements OfficeManager {
 
@@ -29,7 +30,7 @@ class PooledOfficeManager implements OfficeManager {
     private int taskCount;
     private Future<?> currentTask;
 
-    private final Logger logger = Logger.getLogger(getClass().getName());
+    private final Logger logger = LoggerFactory.getLogger(PooledOfficeManager.class);
 
     private OfficeConnectionEventListener connectionEventListener = new OfficeConnectionEventListener() {
         public void connected(OfficeConnectionEvent event) {
@@ -42,7 +43,7 @@ class PooledOfficeManager implements OfficeManager {
                 // expected
                 stopping = false;
             } else {
-                logger.warning("connection lost unexpectedly; attempting restart");
+                logger.warn("connection lost unexpectedly; attempting restart");
                 if (currentTask != null) {
                     currentTask.cancel(true);
                 }
@@ -66,7 +67,7 @@ class PooledOfficeManager implements OfficeManager {
         Future<?> futureTask = taskExecutor.submit(new Runnable() {
             public void run() {
                 if (settings.getMaxTasksPerProcess() > 0 && ++taskCount == settings.getMaxTasksPerProcess() + 1) {
-                    logger.info(String.format("reached limit of %d maxTasksPerProcess: restarting", settings.getMaxTasksPerProcess()));
+                    logger.info("reached limit of {} maxTasksPerProcess: restarting", settings.getMaxTasksPerProcess());
                     taskExecutor.setAvailable(false);
                     stopping = true;
                     managedOfficeProcess.restartAndWait();
